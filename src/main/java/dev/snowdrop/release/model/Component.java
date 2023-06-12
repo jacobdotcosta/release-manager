@@ -91,10 +91,10 @@ public class Component implements IssueSource {
     
     public List<Artifact> getArtifacts() {
         this.artifacts = new LinkedList<>();
-        final Map<String, List<Artifact>> artifacts = parent.getPOM().getArtifacts();
-        for (String property : properties) {
-            this.artifacts.addAll(artifacts.getOrDefault(property, Collections.emptyList()));
-        }
+//        final Map<String, List<Artifact>> artifacts = parent.getPOM().getArtifacts();
+//        for (String property : properties) {
+//            this.artifacts.addAll(artifacts.getOrDefault(property, Collections.emptyList()));
+//        }
         return this.artifacts;
     }
     

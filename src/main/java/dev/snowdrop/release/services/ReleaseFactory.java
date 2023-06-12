@@ -14,6 +14,7 @@
 package dev.snowdrop.release.services;
 
 import dev.snowdrop.release.services.GitService.GitConfig;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,9 +45,11 @@ public class ReleaseFactory {
 
     private static final String DEFAULT_VERSION = "x.y.z";
 
+    private static final String RELEASE_FILES_ROOT_FOLDER = "prod/release/";
+
     static {
         MAPPER.disable(MapperFeature.AUTO_DETECT_CREATORS, MapperFeature.AUTO_DETECT_FIELDS,
-                MapperFeature.AUTO_DETECT_GETTERS, MapperFeature.AUTO_DETECT_IS_GETTERS);
+            MapperFeature.AUTO_DETECT_GETTERS, MapperFeature.AUTO_DETECT_IS_GETTERS);
         final var factory = MAPPER.getFactory();
         factory.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
         factory.enable(YAMLGenerator.Feature.MINIMIZE_QUOTES);
@@ -64,11 +67,12 @@ public class ReleaseFactory {
     }
 
     public Release createFromGitRef(String gitRef, boolean skipProductRequests, boolean skipScheduleValidation)
-            throws Throwable {
+        throws Throwable {
         try (InputStream releaseIS = getStreamFromGitRef(gitRef, "release_template.yml");
-                InputStream pomIS = getStreamFromGitRef(gitRef, "pom.xml")) {
+//             InputStream pomIS = getStreamFromGitRef(gitRef, "pom.xml")
+        ) {
 
-            final var release = createFrom(releaseIS, pomIS, skipProductRequests, skipScheduleValidation);
+            final var release = createFrom(releaseIS, skipProductRequests, skipScheduleValidation);
             release.setGitRef(gitRef);
             System.out.println("Loaded release " + release.getVersion() + " from " + release.getGitRef());
             return release;
@@ -82,10 +86,10 @@ public class ReleaseFactory {
         boolean skipProductRequests,
         boolean skipScheduleValidation,
         String version) throws Throwable {
-        try (InputStream releaseIS = getStreamFromGitRef(gitRef, "release" + "-" + version + ".yml");
-             InputStream pomIS = getStreamFromGitRef(gitRef, "pom.xml")) {
+        try (InputStream releaseIS = getStreamFromGitRef(gitRef, RELEASE_FILES_ROOT_FOLDER + version + "/release.yml");
+        ) {
 
-            final var release = createFrom(releaseIS, pomIS, skipProductRequests, skipScheduleValidation);
+            final var release = createFrom(releaseIS, skipProductRequests, skipScheduleValidation);
             release.setGitRef(gitRef);
             System.out.println("Loaded release " + release.getVersion() + " from " + release.getGitRef());
             return release;
@@ -100,7 +104,7 @@ public class ReleaseFactory {
             if (Utility.isStringNullOrBlank(gitRef)) {
                 throw new IllegalArgumentException("Cannot push changes to Release not associated with a git ref");
             }
-            String releaseFileName = "release" + "-" + release.getVersion() + ".yml";
+            String releaseFileName = RELEASE_FILES_ROOT_FOLDER + release.getVersion() + "/release.yml";
             final var releaseFile = new File(repo, releaseFileName);
             saveTo(release, releaseFile);
         }
@@ -108,14 +112,21 @@ public class ReleaseFactory {
     }
 
     Release createFrom(InputStream releaseIS, InputStream pomIS) throws Throwable {
-        return createFrom(releaseIS, pomIS, false, false);
+        return createFrom(releaseIS, false, false);
     }
 
     public Release createFrom(
-            InputStream releaseIS,
-            InputStream pomIS,
-            boolean skipProductRequests,
-            boolean skipScheduleValidation) throws Throwable {
+        InputStream releaseIS,
+        InputStream pomIS,
+        boolean skipProductRequests,
+        boolean skipScheduleValidation) throws Throwable {
+        return createFrom(releaseIS, skipProductRequests, skipScheduleValidation);
+    }
+
+    public Release createFrom(
+        InputStream releaseIS,
+        boolean skipProductRequests,
+        boolean skipScheduleValidation) throws Throwable {
         try {
             final var release = CompletableFuture.supplyAsync(() -> {
                 try {
@@ -124,29 +135,47 @@ public class ReleaseFactory {
                     throw new CompletionException(e);
                 }
             });
-            final var pom = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return POM.createFrom(pomIS);
-                } catch (Exception e) {
-                    throw new CompletionException(e);
+            return release.handleAsync((r, t) -> {
+                if (t != null) {
+                    System.out.println("################ t: " + t);
+                    throw new RuntimeException(t);
                 }
-            });
-            return pom.thenCombineAsync(release, (p, r) -> {
-                if (r.getVersion() == null || DEFAULT_VERSION.equalsIgnoreCase(r.getVersion()) || r.getVersion().length() <= 0) {
-                    r.setVersion(p.getVersion().replace(".RELEASE",""));
-                }
-                if (!p.getVersion().replace(".RELEASE","").equalsIgnoreCase(r.getVersion())) {
-                    throw new IllegalArgumentException(String.format("pom version (%s) and release version (%s) mismatch",p.getVersion(),r.getVersion()));
-                }
-                r.setPom(p);
+                System.out.println("################ r: " + r + "," + releaseIS);
+                System.out.println("################ t: " + t);
+//                if (r.getVersion() == null || DEFAULT_VERSION.equalsIgnoreCase(r.getVersion()) || r.getVersion().length() <= 0) {
+//                    r.setVersion(p.getVersion().replace(".RELEASE", ""));
+//                }
                 r.setJiraClient(restClient);
                 final var errors = r.validate(skipProductRequests, skipScheduleValidation);
                 if (!errors.isEmpty()) {
                     throw new IllegalArgumentException(errors.stream().reduce("Invalid release:\n", Utility
-                            .errorsFormatter(0)));
+                        .errorsFormatter(0)));
                 }
                 return r;
             }).join();
+//            final var pom = CompletableFuture.supplyAsync(() -> {
+//                try {
+//                    return POM.createFrom(pomIS);
+//                } catch (Exception e) {
+//                    throw new CompletionException(e);
+//                }
+//            });
+//            return pom.thenCombineAsync(release, (p, r) -> {
+//                if (r.getVersion() == null || DEFAULT_VERSION.equalsIgnoreCase(r.getVersion()) || r.getVersion().length() <= 0) {
+//                    r.setVersion(p.getVersion().replace(".RELEASE",""));
+//                }
+//                if (!p.getVersion().replace(".RELEASE","").equalsIgnoreCase(r.getVersion())) {
+//                    throw new IllegalArgumentException(String.format("pom version (%s) and release version (%s) mismatch",p.getVersion(),r.getVersion()));
+//                }
+//                r.setPom(p);
+//                r.setJiraClient(restClient);
+//                final var errors = r.validate(skipProductRequests, skipScheduleValidation);
+//                if (!errors.isEmpty()) {
+//                    throw new IllegalArgumentException(errors.stream().reduce("Invalid release:\n", Utility
+//                            .errorsFormatter(0)));
+//                }
+//                return r;
+//            }).join();
         } catch (CompletionException e) {
             throw e.getCause();
         }

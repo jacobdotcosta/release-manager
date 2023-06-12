@@ -3,9 +3,6 @@ previousVersion: 2.2.10
 # JIRA Project where the release issue should be created
 project: ENTSBT
 
-# Release type: fix,full
-releaseType: fix
-
 # If already created, provide the issue number of the Release, otherwise keep it empty.
 # It will be used by the command create-component to link the stakeholder issues
 #key:         # SB-1484
@@ -137,70 +134,3 @@ components:
             assignee: iocanel
         properties:
             - dekorate
-
-sbExamples:
-    - configmap-example
-    - crud-example
-    - health-check-example
-    - istio-distributed-tracing-example
-    - rest-http-example
-
-dependencies:
-    -   name: commons_logging_version
-        version: 1.2
-    -   name: fabric8.version
-        version: 5.12.1
-    -   name: mksapi_version
-        version: 4.10.9049
-
-gavVersion:
-    -   name: dekorate
-        varName: "dekorate.version"
-        redhatVersion: "2.11.5.redhat-00008"
-        upstreamVersion: "2.11.6"
-    -   name: hibernate-core
-        varName: "hibernate.version"
-        upstreamVersion: "5.6.15.Final"
-        redhatVersion: "5.3.28.Final-redhat-00001"
-    -   name: hibernate-validator
-        varName: "hibernate-validator.version"
-        upstreamVersion: "6.2.5.Final"
-        redhatVersion: "6.0.23.Final-redhat-00001"
-    -   name: tomcat-embed-core
-        varName: "tomcat.version"
-        upstreamVersion: "9.0.75"
-        redhatVersion: "9.0.62.redhat-00005"
-    -   name: resteasy-spring-boot-starter
-        varName: "resteasy-spring-boot-starter.version"
-        upstreamVersion: "3.9.4.Final"
-        redhatVersion: "3.9.4.Final-redhat-00009"
-    -   name: spring_cloud_circuit_breaker
-        varName: "spring-cloud-circuit-breaker.version"
-        redhatVersion: "2.1.7"
-        upstreamVersion: "2.1.7"
-    -   name: spring_cloud_kubernetes
-        varName: "spring-cloud-kubernetes.version"
-        redhatVersion: "2.1.7"
-        upstreamVersion: "2.1.7"
-    -   name: spring_cloud_sleuth_otel
-        varName: "spring-cloud-sleuth-otel.version"
-        redhatVersion: "1.1.3"
-        upstreamVersion: "1.1.3"
-    -   name: spring_cloud_starter_sleuth
-        varName: "spring-cloud-sleuth.version"
-        redhatVersion: "3.1.8"
-        upstreamVersion: "3.1.8"
-
-productized:
-    -   name: undertow_version
-        version: 2.2.19.SP2-redhat-00001
-    -   name: narayana_version
-        version: 5.11.4.Final-redhat-00001
-    -   name: resteasy_version
-        version: 3.15.3.Final-redhat-00001
-    -   name: fabric8_version
-        version: 5.12.1.redhat-00001
-    -   name: narayanasbs_version
-        version: 2.6.7.redhat-00006
-
-clearProject: true

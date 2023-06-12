@@ -167,116 +167,104 @@ public class App implements QuarkusApplication {
         @CommandLine.Option(names = {"-glu", "--gluser"}, description = "Gitlab user name", required = true) String gluser,
         @CommandLine.Option(names = {"-glt", "--gltoken"}, description = "Gitlab API token", required = true) String gltoken,
         @CommandLine.Option(names = {"-r", "--release"}, description = "release", required = true) String release,
-        @CommandLine.Option(names = {"-pr", "--previous-release"},description = "Previous release in the <major>.<minor>.<fix> format (e.g. 2.4.3)",required = true) String previousRelease
+        @CommandLine.Option(names = {"-pr", "--previous-release"}, description = "Previous release in the <major>.<minor>.<fix> format (e.g. 2.4.3)", required = true) String previousRelease
     ) throws Throwable {
         final String[] releaseMajorMinorFix = release.split("\\.");
         final String[] prevReleaseMajorMinorFix = previousRelease.split("\\.");
-        final GitConfig bomGitConfig = GitConfig.githubConfig(gitRef,ghuser, token, Optional.of(String.format("sb-%s.%s.x", prevReleaseMajorMinorFix[0], prevReleaseMajorMinorFix[1])));
+        final GitConfig bomGitConfig = GitConfig.githubConfig(gitRef, ghuser, token, Optional.of(String.format("sb-%s.%s.x", prevReleaseMajorMinorFix[0], prevReleaseMajorMinorFix[1])));
         git.initRepository(bomGitConfig);
         if (!test) {
             springBootBomUpdateService.newMajorMinor(bomGitConfig);
         }
 
-        final GitConfig buildConfigGitlabConfig = GitConfig.gitlabConfig(release,gluser,gltoken,buildConfigForkRepoName,Optional.of("master"), Optional.empty());
+        final GitConfig buildConfigGitlabConfig = GitConfig.gitlabConfig(release, gluser, gltoken, buildConfigForkRepoName, Optional.of("master"), Optional.empty());
         git.initRepository(buildConfigGitlabConfig);
         if (!test) {
-            buildConfigUpdateService.newMajorMinor(buildConfigGitlabConfig,  releaseMajorMinorFix[0], releaseMajorMinorFix[1], prevReleaseMajorMinorFix[0], prevReleaseMajorMinorFix[1]);
+            buildConfigUpdateService.newMajorMinor(buildConfigGitlabConfig, releaseMajorMinorFix[0], releaseMajorMinorFix[1], prevReleaseMajorMinorFix[0], prevReleaseMajorMinorFix[1]);
         }
     }
-
 
     @CommandLine.Command(
         name = "setup-release",
         description = "Start the release process for the release associated with the specified git reference")
     public void setupRelease(
-        @CommandLine.Option(
-            names = {"-g", "--git"},
-            description = "Git reference in the <github org>/<github repo>/<branch> format",
-            required = true) String gitRef,
-        @CommandLine.Option(
-            names = {"-s", "--skip"},
-            description = "Skip product requests") boolean skipProductRequests,
-        @CommandLine.Option(
-            names = {"-t", "--test"},
-            description = "Create a test release ticket using the SB project for all requests") boolean test,
-        @CommandLine.Option(
-            names = {"-ghu", "--ghuser"},
-            description = "Github user name", required = true) String ghuser,
-        @CommandLine.Option(
-            names = {"-o", "--token"},
-            description = "Github API token",
-            required = true) String token,
+        @CommandLine.Option(names = {"-s", "--skip"}, description = "Skip product requests") boolean skipProductRequests,
+        @CommandLine.Option(names = {"-t", "--test"}, description = "Create a test release ticket using the SB project for all requests") boolean test,
+        @CommandLine.Option(names = {"-o", "--token"}, description = "Github API token", required = true) String token,
         @CommandLine.Option(names = {"-glu", "--gluser"}, description = "Gitlab user name", required = true) String gluser,
         @CommandLine.Option(names = {"-glt", "--gltoken"}, description = "Gitlab API token", required = true) String gltoken,
-        @CommandLine.Option(
-            names = {"-r", "--release-date"},
-            description = "Release Date(yyyy-mm-dd)",
-            required = true) String releaseDate,
-        @CommandLine.Option(
-            names = {"-e", "--eol-date"},
-            description = "End of Life Date(yyyy-mm-dd)",
-            required = true) String eolDate,
-        @CommandLine.Option(names = {"-pr", "--previous-release"},description = "Previous release in the <major>.<minor>.<fix> format (e.g. 2.4.3)",required = true) String previousRelease
+        @CommandLine.Option(names = {"-r", "--release-date"}, description = "Release Date(yyyy-mm-dd)", required = true) String releaseDate,
+        @CommandLine.Option(names = {"-e", "--eol-date"}, description = "End of Life Date(yyyy-mm-dd)", required = true) String eolDate,
+        @CommandLine.Option(names = {"-r", "--release"}, description = "Release number in the <major>.<minor>.<fix> format (e.g. 2.4.3)", required = true) String newRelease,
+        @CommandLine.Option(names = {"-pr", "--previous-release"}, description = "Previous release in the <major>.<minor>.<fix> format (e.g. 2.4.3)", required = true) String previousRelease,
+        @CommandLine.Option(names = {"-r", "--release-type"}, description = "Release type, one of fix or full", required = true) String releaseType
     ) throws Throwable {
-        final GitConfig config = GitConfig.githubConfig(gitRef, ghuser, token, Optional.empty());
+        final String gitRef = "snowdrop/infra-prod";
+        final GitConfig config = GitConfig.gitlabConfig(newRelease, gluser, gltoken, gitRef, Optional.empty(), Optional.empty());
         if (!test) {
             git.initRepository(config); // init git repository to be able to update release
         }
 
-        Release release = factory.createFromGitRef(gitRef, skipProductRequests, true);
+        if ("fix".equalsIgnoreCase(releaseType)) {
+            skipProductRequests = true;
+        }
+
+        Release release = factory.createFromGitRef(gitRef, skipProductRequests, true, previousRelease);
         release.setTest(test);
         release.setPreviousVersion(previousRelease);
-
         try {
             release.setSchedule(releaseDate, eolDate);
         } catch (Exception e) {
             LOG.error("Invalid release date", e);
             return;
         }
-
         List<String> errors = release.validateSchedule();
         if (!errors.isEmpty()) {
             throw new IllegalArgumentException(errors.stream().reduce("Invalid release:\n", Utility.errorsFormatter(
                 0)));
         }
+        release.setVersion(newRelease);
+        release.setPreviousVersion(previousRelease);
 
         BasicIssue issue;
         // first check if we already have a release ticket, in which case we don't need
         // to clone the template
-        final String releaseTicket = release.getJiraKey();
-        if (!Utility.isStringNullOrBlank(releaseTicket)) {
-            try {
-                issue = service.getIssue(releaseTicket);
-                LOG.infof("Release ticket %s already exists, skipping cloning step", releaseTicket);
-            } catch (Exception e) {
-                // if we got an exception, assume that it's because we didn't find the ticket
+        if (!"fix".equalsIgnoreCase(releaseType)) {
+            final String releaseTicket = release.getJiraKey();
+            if (!Utility.isStringNullOrBlank(releaseTicket)) {
+                try {
+                    issue = service.getIssue(releaseTicket);
+                    LOG.infof("Release ticket %s already exists, skipping cloning step", releaseTicket);
+                } catch (Exception e) {
+                    // if we got an exception, assume that it's because we didn't find the ticket
+                    issue = clone(release, token);
+                }
+            } else {
+                // no release ticket was specified, clone
                 issue = clone(release, token);
             }
-        } else {
-            // no release ticket was specified, clone
-            issue = clone(release, token);
-        }
 
-        // link CVEs
-        if (!release.isTestMode()) {
-            for (var cve : cveService.listCVEs(Optional.of(release.getVersion()), false)) {
-                service.linkIssue(issue.getKey(), cve.getKey());
+            // link CVEs
+            if (!release.isTestMode()) {
+                for (var cve : cveService.listCVEs(Optional.of(release.getVersion()), false)) {
+                    service.linkIssue(issue.getKey(), cve.getKey());
+                }
             }
-        }
 
-        if (!skipProductRequests) {
-            service.createComponentRequests(release, watchers);
-        }
+            if (!skipProductRequests) {
+                service.createComponentRequests(release, watchers);
+            }
 
-        if (!release.isTestMode()) {
-            git.commitAndPush("chore: update release issues' key [release-manager]", config, repo -> Stream
-                .of(factory.updateRelease(repo, release)));
-        }
-        System.out.println(issue);
+            if (!release.isTestMode()) {
+                git.commitAndPush("chore: update release issues' key [release-manager]", config, repo -> Stream
+                    .of(factory.updateRelease(repo, release)));
+            }
+            System.out.println(issue);
 
-        GitConfig cpaasConfigGitConfig = cpaasCfgService.buildGitConfig(release, gluser, gltoken, Optional.of(CPaaSConfigUpdateService.CPAAS_REPO_NAME));
-        git.initRepository(cpaasConfigGitConfig);
-        cpaasCfgService.newRelease(cpaasConfigGitConfig, release, false);
+            GitConfig cpaasConfigGitConfig = cpaasCfgService.buildGitConfig(release, gluser, gltoken, Optional.of(CPaaSConfigUpdateService.CPAAS_REPO_NAME));
+            git.initRepository(cpaasConfigGitConfig);
+            cpaasCfgService.newRelease(cpaasConfigGitConfig, release, false);
+        }
     }
 
     @CommandLine.Command(

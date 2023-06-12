@@ -52,7 +52,7 @@ public class IssueServiceTest {
     public void cloneAndDeleteIssue() throws Throwable {
         InputStream releaseIS = HelperFunctions.getResourceAsStream("release_template_int_tests.yml");
         Release releaseObj = MAPPER.readValue(releaseIS, Release.class);
-        releaseObj.setPom(POM.createFrom(HelperFunctions.getResourceAsStream("pom.xml")));
+//        releaseObj.setPom(POM.createFrom(HelperFunctions.getResourceAsStream("pom.xml")));
         BasicIssue issueKey = service.clone(releaseObj,Issue.TEST_ISSUE_KEY,List.of());
         assertTrue(issueKey != null && issueKey.getKey() != null && issueKey.getKey().length() > 0, issueKey.getKey());
         try {

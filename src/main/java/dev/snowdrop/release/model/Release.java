@@ -3,14 +3,12 @@ package dev.snowdrop.release.model;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import javax.json.JsonObject;
 
 import static dev.snowdrop.release.services.Utility.isStringNullOrBlank;
 
@@ -22,6 +20,8 @@ public class Release extends Issue {
     @JsonProperty
     private String previousVersion;
     @JsonProperty
+    private String releaseType;
+    @JsonProperty
     private Schedule schedule;
     @JsonProperty
     private List<Component> components;
@@ -29,8 +29,19 @@ public class Release extends Issue {
     private CPaaSConfig cpaas;
     @JsonIgnore
     private String gitRef;
-    @JsonIgnore
-    private POM pom;
+    //    @JsonIgnore
+//    private POM pom;
+    @JsonProperty
+    private List<String> sbExamples;
+    @JsonProperty
+    private List<Variable> dependencies;
+    @JsonProperty
+    private List<Map> gavVersion;
+    @JsonProperty
+    private List<Variable> productized;
+    @JsonProperty
+    private Boolean clearProject;
+
 
     public String getProjectKey() {
         return getProject();
@@ -93,13 +104,13 @@ public class Release extends Issue {
         this.gitRef = gitRef;
     }
 
-    public POM getPOM() {
-        return pom;
-    }
+//    public POM getPOM() {
+//        return pom;
+//    }
 
-    public void setPom(POM pom) {
-        this.pom = pom;
-    }
+//    public void setPom(POM pom) {
+//        this.pom = pom;
+//    }
 
     /**
      * Changes the release definition to use the {@link Issue#TEST_JIRA_PROJECT}
@@ -167,22 +178,26 @@ public class Release extends Issue {
         // validate version
         if (isStringNullOrBlank(version)) {
             errors.add("missing version");
-        } else {
-            if (pom == null) {
-                errors.add("no associated POM");
-            } else {
-                final int suffix = version.indexOf(RELEASE_SUFFIX);
-                final int len = suffix > 0 ? version.length() - suffix : version.length();
-                final var expectedVersion = pom.getVersion();
-                if (!this.version.regionMatches(0, expectedVersion, 0, len)) {
-                    errors.add(String.format("'%s' release version doesn't match '%s' version in associated POM",
-                            this.version, expectedVersion));
-                }
-            }
+//        } else {
+//            if (pom == null) {
+//                errors.add("no associated POM");
+//            } else {
+//                final int suffix = version.indexOf(RELEASE_SUFFIX);
+//                final int len = suffix > 0 ? version.length() - suffix : version.length();
+//                final var expectedVersion = pom.getVersion();
+//                if (!this.version.regionMatches(0, expectedVersion, 0, len)) {
+//                    errors.add(String.format("'%s' release version doesn't match '%s' version in associated POM",
+//                        this.version, expectedVersion));
+//                }
+//            }
         }
 
         if (isStringNullOrBlank(previousVersion)) {
             errors.add("missing previous version");
+        }
+
+        if (isStringNullOrBlank(releaseType)) {
+            errors.add("missing release type");
         }
 
         // validate schedule
@@ -250,5 +265,53 @@ public class Release extends Issue {
 
     public void setCpaas(CPaaSConfig cpaas) {
         this.cpaas = cpaas;
+    }
+
+    public String getReleaseType() {
+        return releaseType;
+    }
+
+    public void setReleaseType(String type) {
+        this.releaseType = type;
+    }
+
+    public List<String> getSbExamples() {
+        return sbExamples;
+    }
+
+    public void setSbExamples(List<String> sbExamples) {
+        this.sbExamples = sbExamples;
+    }
+
+    public List<Variable> getDependencies() {
+        return dependencies;
+    }
+
+    public void setDependencies(List<Variable> dependencies) {
+        this.dependencies = dependencies;
+    }
+
+    public List<Map> getGavVersion() {
+        return gavVersion;
+    }
+
+    public void setGavVersion(List<Map> gavVersion) {
+        this.gavVersion = gavVersion;
+    }
+
+    public List<Variable> getProductized() {
+        return productized;
+    }
+
+    public void setProductized(List<Variable> productized) {
+        this.productized = productized;
+    }
+
+    public Boolean getClearProject() {
+        return clearProject;
+    }
+
+    public void setClearProject(Boolean clearProject) {
+        this.clearProject = clearProject;
     }
 }
